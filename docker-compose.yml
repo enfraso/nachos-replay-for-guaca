@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # ===========================================
+  # Backend API (FastAPI)
+  # ===========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nachos-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://nachos:nachos_secret@db:5432/nachos_replay
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-me}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-jwt-secret-change-me}
+      - LDAP_ENABLED=${LDAP_ENABLED:-false}
+      - GUACAMOLE_RECORDINGS_PATH=/guacamole/recordings
+      - REPLAY_STORAGE_PATH=/app/replays
+    volumes:
+      - replay_storage:/app/replays
+      - guacamole_recordings:/guacamole/recordings:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - nachos-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===========================================
+  # Frontend (Vue.js + Nginx)
+  # ===========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nachos-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    networks:
+      - nachos-network
+
+  # ===========================================
+  # Database (PostgreSQL)
+  # ===========================================
+  db:
+    image: postgres:16-alpine
+    container_name: nachos-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nachos
+      POSTGRES_PASSWORD: nachos_secret
+      POSTGRES_DB: nachos_replay
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - nachos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nachos -d nachos_replay"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Redis (Session/Cache)
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: nachos-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - nachos-network
+
+networks:
+  nachos-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  replay_storage:
+  guacamole_recordings:
+    external: true
+    name: guacamole_recordings

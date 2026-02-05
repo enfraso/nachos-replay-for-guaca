@@ -1,0 +1,150 @@
+/* ===========================================
+   Nachos Replay for Guaca - CSS Variables
+   Caixa Econômica Federal Color Scheme
+   =========================================== */
+
+:root {
+  /* Primary Colors - Caixa Blue */
+  --color-primary-900: #001F3F;
+  --color-primary-800: #002B54;
+  --color-primary-700: #003366;
+  --color-primary-600: #004080;
+  --color-primary-500: #005BAB;
+  --color-primary-400: #0077CC;
+  --color-primary-300: #3399DD;
+  --color-primary-200: #66B3E8;
+  --color-primary-100: #B3D9F2;
+  --color-primary-50: #E6F2FA;
+
+  /* Accent Colors - Caixa Orange */
+  --color-accent-700: #CC4400;
+  --color-accent-600: #E55500;
+  --color-accent-500: #FF6600;
+  --color-accent-400: #FF8833;
+  --color-accent-300: #FFAA66;
+  --color-accent-200: #FFCC99;
+  --color-accent-100: #FFE6CC;
+
+  /* Semantic Colors */
+  --color-success-600: #059669;
+  --color-success-500: #10B981;
+  --color-success-100: #D1FAE5;
+  
+  --color-warning-600: #D97706;
+  --color-warning-500: #F59E0B;
+  --color-warning-100: #FEF3C7;
+  
+  --color-error-600: #DC2626;
+  --color-error-500: #EF4444;
+  --color-error-100: #FEE2E2;
+
+  --color-info-500: #3B82F6;
+  --color-info-100: #DBEAFE;
+
+  /* Neutral Colors */
+  --color-gray-900: #111827;
+  --color-gray-800: #1F2937;
+  --color-gray-700: #374151;
+  --color-gray-600: #4B5563;
+  --color-gray-500: #6B7280;
+  --color-gray-400: #9CA3AF;
+  --color-gray-300: #D1D5DB;
+  --color-gray-200: #E5E7EB;
+  --color-gray-100: #F3F4F6;
+  --color-gray-50: #F9FAFB;
+
+  /* Background Colors */
+  --bg-primary: #F5F7FA;
+  --bg-secondary: #FFFFFF;
+  --bg-dark: #1A1A2E;
+  --bg-card: #FFFFFF;
+  --bg-sidebar: var(--color-primary-800);
+  --bg-header: #FFFFFF;
+
+  /* Text Colors */
+  --text-primary: #1A1A2E;
+  --text-secondary: #6B7280;
+  --text-muted: #9CA3AF;
+  --text-inverse: #FFFFFF;
+  --text-link: var(--color-primary-500);
+
+  /* Border & Shadow */
+  --border-color: var(--color-gray-200);
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  --border-radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+
+  /* Z-Index */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal-backdrop: 300;
+  --z-modal: 400;
+  --z-tooltip: 500;
+  --z-notification: 600;
+
+  /* Layout */
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 72px;
+  --header-height: 64px;
+  --content-max-width: 1400px;
+}
+
+/* Dark Mode Variables */
+[data-theme="dark"] {
+  --bg-primary: #0D1117;
+  --bg-secondary: #161B22;
+  --bg-card: #21262D;
+  --bg-sidebar: #0D1117;
+  --bg-header: #161B22;
+  
+  --text-primary: #F0F6FC;
+  --text-secondary: #8B949E;
+  --text-muted: #6E7681;
+  
+  --border-color: #30363D;
+  
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
