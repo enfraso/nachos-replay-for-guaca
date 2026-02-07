@@ -1,293 +1,201 @@
 <template>
-  <div class="audit-page">
-    <!-- Header -->
-    <div class="page-header">
-      <h2>{{ $t('audit.title') }}</h2>
-      <div class="header-actions">
-        <button class="btn btn-secondary" @click="exportLogs('csv')">
-          📥 {{ $t('audit.exportCsv') }}
-        </button>
-        <button class="btn btn-secondary" @click="exportLogs('json')">
-          📥 {{ $t('audit.exportJson') }}
-        </button>
-      </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="filters-card card">
-      <div class="card-body">
-        <div class="filters-grid">
-          <div class="form-group">
-            <input
-              v-model="filters.username"
-              type="text"
-              class="form-input"
-              :placeholder="$t('audit.user')"
-            />
-          </div>
-          <div class="form-group">
-            <select v-model="filters.action" class="form-select">
-              <option value="">{{ $t('common.all') }} {{ $t('audit.action') }}</option>
-              <option v-for="action in actions" :key="action" :value="action">
-                {{ $t(`audit.actions.${action}`) }}
-              </option>
-            </select>
-          </div>
-          <div class="form-group">
-            <input
-              v-model="filters.ip"
-              type="text"
-              class="form-input"
-              :placeholder="$t('audit.ip')"
-            />
-          </div>
-          <div class="form-group">
-            <input
-              v-model="filters.dateFrom"
-              type="date"
-              class="form-input"
-            />
-          </div>
-          <div class="form-group">
-            <input
-              v-model="filters.dateTo"
-              type="date"
-              class="form-input"
-            />
-          </div>
-          <button class="btn btn-primary" @click="fetchLogs">
-            {{ $t('common.filter') }}
-          </button>
+    <div class="audit-page">
+        <div class="page-header">
+            <div>
+                <h2>{{ $t('audit.title') }}</h2>
+                <p class="text-muted">{{ $t('audit.subtitle') }}</p>
+            </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Table -->
-    <div class="card">
-      <div class="table-container">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>{{ $t('audit.timestamp') }}</th>
-              <th>{{ $t('audit.user') }}</th>
-              <th>{{ $t('audit.action') }}</th>
-              <th>{{ $t('audit.ip') }}</th>
-              <th>{{ $t('audit.details') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="isLoading">
-              <td colspan="5" class="text-center p-lg">
-                <div class="spinner"></div>
-              </td>
-            </tr>
-            <tr v-else-if="logs.length === 0">
-              <td colspan="5" class="text-center p-lg text-muted">
-                {{ $t('common.noData') }}
-              </td>
-            </tr>
-            <tr v-for="log in logs" :key="log.id">
-              <td>{{ formatDate(log.created_at) }}</td>
-              <td>{{ log.username || '-' }}</td>
-              <td>
-                <span :class="['badge', getActionBadge(log.action)]">
-                  {{ $t(`audit.actions.${log.action}`) }}
-                </span>
-              </td>
-              <td>{{ log.ip_address || '-' }}</td>
-              <td class="details-cell">
-                <code v-if="log.details && Object.keys(log.details).length">
-                  {{ JSON.stringify(log.details).slice(0, 50) }}...
-                </code>
-                <span v-else class="text-muted">-</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <!-- Filters -->
+        <div class="filters-section">
+            <div class="filters-row">
+                <input
+                    v-model="searchQuery"
+                    type="text"
+                    class="form-input flex-1"
+                    placeholder="Buscar por usuário ou ação..."
+                    @keyup.enter="fetchLogs"
+                />
+                <input
+                    v-model="filterDate"
+                    type="date"
+                    class="form-input"
+                />
+                <button class="btn btn-primary" @click="fetchLogs">
+                    🔍 {{ $t('common.search') }}
+                </button>
+            </div>
+        </div>
 
-      <!-- Pagination -->
-      <div class="card-footer">
-        <div class="pagination-info">
-          {{ $t('common.page') }} {{ page }} {{ $t('common.of') }} {{ totalPages }}
+        <!-- Loading -->
+        <div v-if="isLoading" class="loading-container">
+            <div class="spinner spinner-lg"></div>
         </div>
-        <div class="pagination">
-          <button 
-            class="pagination-item"
-            :disabled="page === 1"
-            @click="goToPage(page - 1)"
-          >
-            ←
-          </button>
-          <button 
-            class="pagination-item"
-            :disabled="page === totalPages"
-            @click="goToPage(page + 1)"
-          >
-            →
-          </button>
+
+        <!-- Empty State -->
+        <div v-else-if="logs.length === 0" class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <div class="empty-state-title">{{ $t('audit.noLogs') }}</div>
         </div>
-      </div>
+
+        <!-- Logs Table -->
+        <div v-else class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>{{ $t('audit.timestamp') }}</th>
+                        <th>{{ $t('common.user') }}</th>
+                        <th>{{ $t('audit.action') }}</th>
+                        <th>{{ $t('audit.resource') }}</th>
+                        <th>{{ $t('audit.ip') }}</th>
+                        <th>{{ $t('audit.details') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="log in logs" :key="log.id">
+                        <td>{{ formatDate(log.timestamp) }}</td>
+                        <td><strong>{{ log.username }}</strong></td>
+                        <td>
+                            <span :class="['badge', getActionBadge(log.action)]">
+                                {{ log.action }}
+                            </span>
+                        </td>
+                        <td>{{ log.resource_type }}/{{ log.resource_id }}</td>
+                        <td><code>{{ log.ip_address }}</code></td>
+                        <td class="truncate" style="max-width: 200px">
+                            {{ log.details || '-' }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="logs.length > 0" class="pagination-container">
+            <div class="pagination-info">
+                {{ $t('pagination.showing') }} {{ logs.length }} {{ $t('pagination.results') }}
+            </div>
+            <div class="pagination">
+                <button
+                    class="pagination-item"
+                    :class="{ disabled: page <= 1 }"
+                    @click="prevPage"
+                >
+                    ←
+                </button>
+                <span class="pagination-item active">{{ page }}</span>
+                <button
+                    class="pagination-item"
+                    :class="{ disabled: !hasMore }"
+                    @click="nextPage"
+                >
+                    →
+                </button>
+            </div>
+        </div>
     </div>
-  </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/composables/useApi'
 
 const { locale } = useI18n()
 
 const logs = ref([])
-const total = ref(0)
+const isLoading = ref(true)
+const searchQuery = ref('')
+const filterDate = ref('')
 const page = ref(1)
-const pageSize = ref(20)
-const isLoading = ref(false)
-
-const filters = reactive({
-  username: '',
-  action: '',
-  ip: '',
-  dateFrom: '',
-  dateTo: ''
-})
-
-const actions = ['view', 'download', 'search', 'login', 'logout', 'export', 'create', 'update', 'delete']
-
-const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 1)
+const hasMore = ref(true)
 
 function formatDate(dateStr) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString(locale.value)
+    if (!dateStr) return '-'
+    return new Date(dateStr).toLocaleString(locale.value)
 }
 
 function getActionBadge(action) {
-  const badges = {
-    view: 'badge-primary',
-    download: 'badge-accent',
-    search: 'badge-primary',
-    login: 'badge-success',
-    logout: 'badge-warning',
-    export: 'badge-accent',
-    create: 'badge-success',
-    update: 'badge-warning',
-    delete: 'badge-error'
-  }
-  return badges[action] || 'badge-primary'
+    const actions = {
+        login: 'badge-success',
+        logout: 'badge-gray',
+        create: 'badge-primary',
+        update: 'badge-warning',
+        delete: 'badge-error',
+        view: 'badge-accent'
+    }
+    return actions[action?.toLowerCase()] || 'badge-gray'
 }
 
 async function fetchLogs() {
-  isLoading.value = true
-
-  try {
-    const params = new URLSearchParams()
-    params.append('page', page.value)
-    params.append('page_size', pageSize.value)
-    
-    if (filters.username) params.append('username', filters.username)
-    if (filters.action) params.append('action', filters.action)
-    if (filters.ip) params.append('ip_address', filters.ip)
-    if (filters.dateFrom) params.append('date_from', filters.dateFrom)
-    if (filters.dateTo) params.append('date_to', filters.dateTo)
-
-    const response = await api.get(`/api/audit/logs?${params.toString()}`)
-    
-    logs.value = response.data.items
-    total.value = response.data.total
-  } catch (err) {
-    console.error('Failed to fetch audit logs:', err)
-  } finally {
-    isLoading.value = false
-  }
+    isLoading.value = true
+    try {
+        const params = new URLSearchParams({ page: page.value, per_page: 20 })
+        if (searchQuery.value) params.append('search', searchQuery.value)
+        if (filterDate.value) params.append('date', filterDate.value)
+        
+        const { data } = await api.get(`/api/audit?${params}`)
+        logs.value = data.items || data || []
+        hasMore.value = logs.value.length >= 20
+    } catch (err) {
+        console.error('Failed to fetch audit logs:', err)
+        logs.value = []
+    } finally {
+        isLoading.value = false
+    }
 }
 
-function goToPage(newPage) {
-  page.value = newPage
-  fetchLogs()
+function nextPage() {
+    if (hasMore.value) {
+        page.value++
+        fetchLogs()
+    }
 }
 
-async function exportLogs(format) {
-  try {
-    const params = new URLSearchParams()
-    params.append('format', format)
-    
-    if (filters.username) params.append('username', filters.username)
-    if (filters.action) params.append('action', filters.action)
-    if (filters.dateFrom) params.append('date_from', filters.dateFrom)
-    if (filters.dateTo) params.append('date_to', filters.dateTo)
-
-    const response = await api.get(`/api/audit/export?${params.toString()}`, {
-      responseType: 'blob'
-    })
-
-    // Download file
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `audit_logs.${format}`)
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-  } catch (err) {
-    console.error('Failed to export logs:', err)
-  }
+function prevPage() {
+    if (page.value > 1) {
+        page.value--
+        fetchLogs()
+    }
 }
 
-onMounted(() => {
-  fetchLogs()
-})
+onMounted(() => fetchLogs())
 </script>
 
 <style scoped>
+.audit-page {
+    max-width: var(--content-max-width);
+}
+
 .page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
 }
 
-.header-actions {
-  display: flex;
-  gap: var(--spacing-sm);
+.filters-section {
+    margin-bottom: var(--spacing-lg);
 }
 
-.filters-card {
-  margin-bottom: var(--spacing-lg);
+.filters-row {
+    display: flex;
+    gap: var(--spacing-sm);
 }
 
-.filters-grid {
-  display: flex;
-  gap: var(--spacing-md);
-  align-items: flex-end;
-  flex-wrap: wrap;
+.loading-container {
+    text-align: center;
+    padding: var(--spacing-3xl);
 }
 
-.filters-grid .form-group {
-  margin-bottom: 0;
-  flex: 1;
-  min-width: 120px;
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--spacing-lg);
 }
 
-.details-cell {
-  max-width: 200px;
-}
-
-.details-cell code {
-  font-size: var(--font-size-xs);
-  background: var(--color-gray-100);
-  padding: 2px 4px;
-  border-radius: var(--border-radius-sm);
-}
-
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.pagination-info {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
+@media (max-width: 768px) {
+    .filters-row {
+        flex-direction: column;
+    }
 }
 </style>

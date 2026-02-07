@@ -1,255 +1,219 @@
 <template>
-  <div class="settings-page">
-    <h2>{{ $t('nav.settings') }}</h2>
-
-    <!-- System Settings -->
-    <div class="card">
-      <div class="card-header">
-        <h3>⚙️ System Settings</h3>
-      </div>
-      <div class="card-body">
-        <div class="settings-grid">
-          <div class="form-group">
-            <label class="form-label">Replay Directory</label>
-            <input 
-              v-model="settings.replay_directory" 
-              type="text" 
-              class="form-input"
-              disabled
-            />
-            <p class="form-hint">Configured via environment variable</p>
-          </div>
-          <div class="form-group">
-            <label class="form-label">File Scan Interval (minutes)</label>
-            <input 
-              v-model.number="settings.scan_interval" 
-              type="number" 
-              class="form-input"
-              min="1"
-              max="60"
-            />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Archive After (days)</label>
-            <input 
-              v-model.number="settings.archive_after_days" 
-              type="number" 
-              class="form-input"
-              min="1"
-            />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Delete After (days)</label>
-            <input 
-              v-model.number="settings.delete_after_days" 
-              type="number" 
-              class="form-input"
-              min="1"
-            />
-          </div>
+    <div class="settings-page">
+        <div class="page-header">
+            <h2>{{ $t('settings.title') }}</h2>
+            <p class="text-muted">{{ $t('settings.subtitle') }}</p>
         </div>
-      </div>
-    </div>
 
-    <!-- LDAP Settings -->
-    <div class="card mt-lg">
-      <div class="card-header">
-        <h3>🔐 AD/LDAP Settings</h3>
-      </div>
-      <div class="card-body">
-        <div class="settings-grid">
-          <div class="form-group full-width">
-            <label class="form-label">
-              <input type="checkbox" v-model="settings.ldap_enabled" />
-              Enable AD/LDAP Authentication
-            </label>
-          </div>
-          <div class="form-group">
-            <label class="form-label">LDAP Server URL</label>
-            <input 
-              v-model="settings.ldap_url" 
-              type="text" 
-              class="form-input"
-              placeholder="ldap://domain.local:389"
-              :disabled="!settings.ldap_enabled"
-            />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Base DN</label>
-            <input 
-              v-model="settings.ldap_base_dn" 
-              type="text" 
-              class="form-input"
-              placeholder="DC=domain,DC=local"
-              :disabled="!settings.ldap_enabled"
-            />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Bind User</label>
-            <input 
-              v-model="settings.ldap_bind_user" 
-              type="text" 
-              class="form-input"
-              :disabled="!settings.ldap_enabled"
-            />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Bind Password</label>
-            <input 
-              v-model="settings.ldap_bind_password" 
-              type="password" 
-              class="form-input"
-              :disabled="!settings.ldap_enabled"
-            />
-          </div>
+        <!-- Tabs -->
+        <div class="settings-tabs">
+            <button
+                v-for="tab in tabs"
+                :key="tab.id"
+                :class="['tab-btn', { active: activeTab === tab.id }]"
+                @click="activeTab = tab.id"
+            >
+                {{ tab.icon }} {{ $t(`settings.${tab.id}`) }}
+            </button>
         </div>
-      </div>
-    </div>
 
-    <!-- Storage Stats -->
-    <div class="card mt-lg">
-      <div class="card-header">
-        <h3>💾 Storage Statistics</h3>
-      </div>
-      <div class="card-body">
-        <div class="stats-row">
-          <div class="stat-item">
-            <span class="stat-value">{{ formatBytes(storageStats.total_size) }}</span>
-            <span class="stat-label">Total Size</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-value">{{ storageStats.total_files }}</span>
-            <span class="stat-label">Total Files</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-value">{{ storageStats.active_files }}</span>
-            <span class="stat-label">Active</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-value">{{ storageStats.archived_files }}</span>
-            <span class="stat-label">Archived</span>
-          </div>
+        <!-- General Settings -->
+        <div v-if="activeTab === 'general'" class="settings-section card">
+            <div class="card-body">
+                <form @submit.prevent="saveSettings">
+                    <div class="form-group">
+                        <label class="form-label">{{ $t('settings.appName') }}</label>
+                        <input v-model="settings.app_name" type="text" class="form-input" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">{{ $t('settings.language') }}</label>
+                        <select v-model="settings.language" class="form-select">
+                            <option value="pt-BR">Português (Brasil)</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">{{ $t('settings.theme') }}</label>
+                        <select v-model="settings.theme" class="form-select">
+                            <option value="light">{{ $t('settings.themes.light') }}</option>
+                            <option value="dark">{{ $t('settings.themes.dark') }}</option>
+                            <option value="auto">{{ $t('settings.themes.auto') }}</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary" :disabled="isSaving">
+                        <span v-if="isSaving" class="spinner spinner-white"></span>
+                        <span v-else>{{ $t('common.save') }}</span>
+                    </button>
+                </form>
+            </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Actions -->
-    <div class="page-actions mt-lg">
-      <button class="btn btn-primary" @click="saveSettings">
-        {{ $t('common.save') }}
-      </button>
+        <!-- Storage Settings -->
+        <div v-if="activeTab === 'storage'" class="settings-section card">
+            <div class="card-body">
+                <form @submit.prevent="saveSettings">
+                    <div class="form-group">
+                        <label class="form-label">{{ $t('settings.retentionDays') }}</label>
+                        <input v-model.number="settings.retention_days" type="number" min="1" class="form-input" />
+                        <span class="form-hint">Replays mais antigos serão excluídos automaticamente</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">{{ $t('settings.maxStorageGB') }}</label>
+                        <input v-model.number="settings.max_storage_gb" type="number" min="1" class="form-input" />
+                    </div>
+                    <button type="submit" class="btn btn-primary" :disabled="isSaving">
+                        {{ $t('common.save') }}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- LDAP Settings -->
+        <div v-if="activeTab === 'ldap'" class="settings-section card">
+            <div class="card-body">
+                <form @submit.prevent="saveSettings">
+                    <div class="form-group">
+                        <label class="flex items-center gap-sm">
+                            <input v-model="settings.ldap_enabled" type="checkbox" />
+                            <span>{{ $t('settings.ldapEnabled') }}</span>
+                        </label>
+                    </div>
+                    <template v-if="settings.ldap_enabled">
+                        <div class="form-group">
+                            <label class="form-label">{{ $t('settings.ldapServer') }}</label>
+                            <input v-model="settings.ldap_server" type="text" class="form-input" placeholder="ldap://servidor:389" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">{{ $t('settings.ldapBaseDN') }}</label>
+                            <input v-model="settings.ldap_base_dn" type="text" class="form-input" placeholder="dc=empresa,dc=com" />
+                        </div>
+                    </template>
+                    <button type="submit" class="btn btn-primary" :disabled="isSaving">
+                        {{ $t('common.save') }}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Success Message -->
+        <div v-if="showSuccess" class="alert alert-success mt-md">
+            ✅ {{ $t('settings.saveSuccess') }}
+        </div>
     </div>
-  </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import api from '@/composables/useApi'
 
-const settings = reactive({
-  replay_directory: '/var/lib/guacamole/recordings',
-  scan_interval: 5,
-  archive_after_days: 90,
-  delete_after_days: 365,
-  ldap_enabled: false,
-  ldap_url: '',
-  ldap_base_dn: '',
-  ldap_bind_user: '',
-  ldap_bind_password: ''
-})
+const tabs = [
+    { id: 'general', icon: '⚙️' },
+    { id: 'storage', icon: '💾' },
+    { id: 'ldap', icon: '🔐' }
+]
 
-const storageStats = ref({
-  total_size: 0,
-  total_files: 0,
-  active_files: 0,
-  archived_files: 0
-})
+const activeTab = ref('general')
+const isSaving = ref(false)
+const showSuccess = ref(false)
 
-function formatBytes(bytes) {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
-}
+const settings = ref({
+    app_name: 'Nachos Replay',
+    language: 'pt-BR',
+    theme: 'light',
+    retention_days: 90,
+    max_storage_gb: 100,
+    ldap_enabled: false,
+    ldap_server: '',
+    ldap_base_dn: ''
+})
 
 async function fetchSettings() {
-  try {
-    const response = await api.get('/api/stats/storage')
-    storageStats.value = response.data
-  } catch (err) {
-    console.error('Failed to fetch storage stats:', err)
-  }
+    try {
+        const { data } = await api.get('/api/settings')
+        settings.value = { ...settings.value, ...data }
+    } catch (err) {
+        console.error('Failed to fetch settings:', err)
+    }
 }
 
 async function saveSettings() {
-  try {
-    // In a real implementation, this would save to the backend
-    console.log('Saving settings:', settings)
-    alert('Settings saved successfully!')
-  } catch (err) {
-    console.error('Failed to save settings:', err)
-  }
+    isSaving.value = true
+    showSuccess.value = false
+    try {
+        await api.put('/api/settings', settings.value)
+        showSuccess.value = true
+        setTimeout(() => showSuccess.value = false, 3000)
+    } catch (err) {
+        console.error('Failed to save settings:', err)
+    } finally {
+        isSaving.value = false
+    }
 }
 
-onMounted(() => {
-  fetchSettings()
-})
+onMounted(() => fetchSettings())
 </script>
 
 <style scoped>
-.settings-page h2 {
-  margin-bottom: var(--spacing-lg);
+.settings-page {
+    max-width: 800px;
 }
 
-.settings-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-md);
+.page-header {
+    margin-bottom: var(--spacing-lg);
 }
 
-.settings-grid .full-width {
-  grid-column: 1 / -1;
+.settings-tabs {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-lg);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: var(--spacing-xs);
 }
 
-.form-hint {
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
-  margin-top: var(--spacing-xs);
+.tab-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: none;
+    border: none;
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    transition: all var(--transition-fast);
 }
 
-.stats-row {
-  display: flex;
-  gap: var(--spacing-xl);
+.tab-btn:hover {
+    color: var(--text-primary);
+    background: var(--color-gray-100);
 }
 
-.stat-item {
-  display: flex;
-  flex-direction: column;
+.tab-btn.active {
+    color: var(--color-primary-500);
+    background: var(--color-primary-50);
+    font-weight: var(--font-weight-medium);
 }
 
-.stat-item .stat-value {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-primary-500);
+.settings-section {
+    margin-bottom: var(--spacing-lg);
 }
 
-.stat-item .stat-label {
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
-}
-
-.page-actions {
-  display: flex;
-  justify-content: flex-end;
+.form-select {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
 }
 
 @media (max-width: 768px) {
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .stats-row {
-    flex-wrap: wrap;
-  }
+    .settings-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .tab-btn {
+        flex: 1;
+        text-align: center;
+    }
 }
 </style>

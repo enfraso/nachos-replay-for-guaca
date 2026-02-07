@@ -1,374 +1,357 @@
 <template>
-  <div class="replays-page">
-    <!-- Header -->
-    <div class="page-header">
-      <h2>{{ $t('replays.title') }}</h2>
-      <div class="header-actions">
-        <button 
-          v-if="replaysStore.hasFilters" 
-          class="btn btn-secondary"
-          @click="replaysStore.clearFilters(); fetchReplays()"
-        >
-          {{ $t('common.clear') }}
-        </button>
-      </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="filters-card card">
-      <div class="card-body">
-        <div class="filters-grid">
-          <div class="form-group">
-            <input
-              v-model="filters.query"
-              type="text"
-              class="form-input"
-              :placeholder="$t('replays.search')"
-              @keyup.enter="applyFilters"
-            />
-          </div>
-          <div class="form-group">
-            <input
-              v-model="filters.username"
-              type="text"
-              class="form-input"
-              :placeholder="$t('replays.user')"
-            />
-          </div>
-          <div class="form-group">
-            <input
-              v-model="filters.clientIp"
-              type="text"
-              class="form-input"
-              :placeholder="$t('replays.ip')"
-            />
-          </div>
-          <div class="form-group">
-            <select v-model="filters.status" class="form-select">
-              <option value="">{{ $t('common.all') }} {{ $t('replays.status') }}</option>
-              <option value="active">{{ $t('replays.active') }}</option>
-              <option value="archived">{{ $t('replays.archived') }}</option>
-            </select>
-          </div>
-          <button class="btn btn-primary" @click="applyFilters">
-            {{ $t('common.filter') }}
-          </button>
+    <div class="replays-page">
+        <!-- Header -->
+        <div class="page-header">
+            <div>
+                <h2>{{ $t('replays.title') }}</h2>
+                <p class="text-muted">{{ $t('replays.subtitle') }}</p>
+            </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Table -->
-    <div class="card">
-      <div class="table-container">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>{{ $t('replays.session') }}</th>
-              <th>{{ $t('replays.user') }}</th>
-              <th>{{ $t('replays.ip') }}</th>
-              <th>{{ $t('replays.duration') }}</th>
-              <th>{{ $t('replays.date') }}</th>
-              <th>{{ $t('replays.size') }}</th>
-              <th>{{ $t('replays.status') }}</th>
-              <th>{{ $t('replays.actions') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="replaysStore.isLoading">
-              <td colspan="8" class="text-center p-lg">
-                <div class="spinner"></div>
-              </td>
-            </tr>
-            <tr v-else-if="replaysStore.replays.length === 0">
-              <td colspan="8" class="text-center p-lg text-muted">
-                {{ $t('replays.noResults') }}
-              </td>
-            </tr>
-            <tr v-for="replay in replaysStore.replays" :key="replay.id">
-              <td>
-                <div class="replay-name">
-                  <span class="filename">{{ replay.session_name || replay.filename }}</span>
+        <!-- Filters -->
+        <div class="filters-section">
+            <div class="search-box">
+                <input
+                    v-model="searchQuery"
+                    type="text"
+                    class="form-input"
+                    :placeholder="$t('replays.searchPlaceholder')"
+                    @keyup.enter="applyFilters"
+                />
+                <button class="btn btn-primary" @click="applyFilters">
+                    🔍 {{ $t('common.search') }}
+                </button>
+            </div>
+            
+            <div class="filters-row">
+                <input
+                    v-model="filterStartDate"
+                    type="date"
+                    class="form-input filter-input"
+                />
+                <input
+                    v-model="filterEndDate"
+                    type="date"
+                    class="form-input filter-input"
+                />
+                <button class="btn btn-secondary" @click="resetFilters">
+                    {{ $t('common.clear') }}
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div v-if="replaysStore.isLoading" class="loading-container">
+            <div class="spinner spinner-lg"></div>
+            <p>{{ $t('common.loading') }}</p>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else-if="replaysStore.replays.length === 0" class="empty-state">
+            <div class="empty-state-icon">🎬</div>
+            <div class="empty-state-title">{{ $t('replays.noReplays') }}</div>
+            <div class="empty-state-description">{{ $t('common.noResults') }}</div>
+        </div>
+
+        <!-- Replays Table (Desktop) -->
+        <div v-else class="table-container hide-mobile">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>{{ $t('common.user') }}</th>
+                        <th>{{ $t('replays.hostname') }}</th>
+                        <th>{{ $t('replays.protocol') }}</th>
+                        <th>{{ $t('replays.startDate') }}</th>
+                        <th>{{ $t('replays.duration') }}</th>
+                        <th>{{ $t('replays.size') }}</th>
+                        <th>{{ $t('common.actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="replay in replaysStore.replays" :key="replay.id">
+                        <td>
+                            <strong>{{ replay.username }}</strong>
+                        </td>
+                        <td>{{ replay.hostname || '-' }}</td>
+                        <td>
+                            <span class="badge badge-primary">{{ replay.protocol?.toUpperCase() || 'RDP' }}</span>
+                        </td>
+                        <td>{{ formatDate(replay.start_time) }}</td>
+                        <td>{{ formatDuration(replay.duration) }}</td>
+                        <td>{{ formatBytes(replay.size_bytes) }}</td>
+                        <td class="table-actions">
+                            <router-link
+                                :to="`/replays/${replay.id}`"
+                                class="btn btn-sm btn-primary"
+                            >
+                                ▶ {{ $t('replays.play') }}
+                            </router-link>
+                            <button
+                                v-if="authStore.isAdmin"
+                                class="btn btn-sm btn-danger"
+                                @click="confirmDelete(replay)"
+                            >
+                                🗑️
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Replays Cards (Mobile) -->
+        <div class="replays-cards hide-desktop">
+            <div v-for="replay in replaysStore.replays" :key="replay.id" class="replay-card">
+                <div class="replay-card-header">
+                    <strong>{{ replay.username }}</strong>
+                    <span class="badge badge-primary">{{ replay.protocol?.toUpperCase() || 'RDP' }}</span>
                 </div>
-              </td>
-              <td>{{ replay.owner_username || '-' }}</td>
-              <td>{{ replay.client_ip || '-' }}</td>
-              <td>{{ formatDuration(replay.duration_seconds) }}</td>
-              <td>{{ formatDate(replay.session_start || replay.imported_at) }}</td>
-              <td>{{ formatBytes(replay.file_size) }}</td>
-              <td>
-                <span :class="['badge', `badge-${getStatusColor(replay.status)}`]">
-                  {{ $t(`replays.${replay.status}`) }}
-                </span>
-              </td>
-              <td>
-                <div class="actions">
-                  <button 
-                    class="btn btn-sm btn-primary"
-                    @click="openPlayer(replay.id)"
-                    :title="$t('replays.play')"
-                  >
-                    ▶
-                  </button>
-                  <button 
-                    v-if="authStore.isAdmin"
-                    class="btn btn-sm btn-danger"
-                    @click="confirmDelete(replay)"
-                    :title="$t('replays.delete')"
-                  >
-                    🗑
-                  </button>
+                <div class="replay-card-body">
+                    <div class="replay-info">
+                        <span class="label">Host:</span>
+                        <span>{{ replay.hostname || '-' }}</span>
+                    </div>
+                    <div class="replay-info">
+                        <span class="label">Data:</span>
+                        <span>{{ formatDate(replay.start_time) }}</span>
+                    </div>
+                    <div class="replay-info">
+                        <span class="label">Duração:</span>
+                        <span>{{ formatDuration(replay.duration) }}</span>
+                    </div>
                 </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                <div class="replay-card-footer">
+                    <router-link
+                        :to="`/replays/${replay.id}`"
+                        class="btn btn-sm btn-primary btn-block"
+                    >
+                        ▶ {{ $t('replays.play') }}
+                    </router-link>
+                </div>
+            </div>
+        </div>
 
-      <!-- Pagination -->
-      <div class="card-footer">
-        <div class="pagination-info">
-          {{ $t('common.showing') }} 
-          {{ (replaysStore.page - 1) * replaysStore.pageSize + 1 }}
-          - {{ Math.min(replaysStore.page * replaysStore.pageSize, replaysStore.total) }}
-          {{ $t('common.of') }} {{ replaysStore.total }} {{ $t('common.items') }}
+        <!-- Pagination -->
+        <div v-if="replaysStore.replays.length > 0" class="pagination-container">
+            <div class="pagination-info">
+                {{ $t('pagination.showing') }} {{ (replaysStore.page - 1) * replaysStore.perPage + 1 }}-{{ Math.min(replaysStore.page * replaysStore.perPage, replaysStore.total) }} {{ $t('pagination.of') }} {{ replaysStore.total }}
+            </div>
+            <div class="pagination">
+                <button
+                    class="pagination-item"
+                    :class="{ disabled: !replaysStore.hasPrevPage }"
+                    @click="replaysStore.prevPage()"
+                >
+                    ←
+                </button>
+                <span class="pagination-item active">{{ replaysStore.page }}</span>
+                <button
+                    class="pagination-item"
+                    :class="{ disabled: !replaysStore.hasNextPage }"
+                    @click="replaysStore.nextPage()"
+                >
+                    →
+                </button>
+            </div>
         </div>
-        <div class="pagination">
-          <button 
-            class="pagination-item"
-            :disabled="replaysStore.page === 1"
-            @click="goToPage(replaysStore.page - 1)"
-          >
-            ←
-          </button>
-          <template v-for="p in visiblePages" :key="p">
-            <button 
-              class="pagination-item"
-              :class="{ active: p === replaysStore.page }"
-              @click="goToPage(p)"
-            >
-              {{ p }}
-            </button>
-          </template>
-          <button 
-            class="pagination-item"
-            :disabled="replaysStore.page === replaysStore.totalPages"
-            @click="goToPage(replaysStore.page + 1)"
-          >
-            →
-          </button>
-        </div>
-      </div>
     </div>
-
-    <!-- Delete Confirmation Modal -->
-    <div v-if="deleteModal" class="modal-backdrop" @click.self="deleteModal = null">
-      <div class="modal">
-        <h3>{{ $t('replays.delete') }}</h3>
-        <p>{{ $t('replays.confirmDelete') }}</p>
-        <p class="text-muted text-sm">{{ deleteModal.filename }}</p>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" @click="deleteModal = null">
-            {{ $t('common.cancel') }}
-          </button>
-          <button class="btn btn-danger" @click="deleteReplay">
-            {{ $t('replays.delete') }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useReplaysStore } from '@/stores/replays'
 import { useAuthStore } from '@/stores/auth'
+import { useReplaysStore } from '@/stores/replays'
 
-const router = useRouter()
 const { locale } = useI18n()
-const replaysStore = useReplaysStore()
 const authStore = useAuthStore()
+const replaysStore = useReplaysStore()
 
-const filters = reactive({
-  query: '',
-  username: '',
-  clientIp: '',
-  status: ''
-})
-
-const deleteModal = ref(null)
-
-const visiblePages = computed(() => {
-  const total = replaysStore.totalPages
-  const current = replaysStore.page
-  const pages = []
-  
-  let start = Math.max(1, current - 2)
-  let end = Math.min(total, current + 2)
-  
-  if (end - start < 4) {
-    if (start === 1) end = Math.min(total, 5)
-    else start = Math.max(1, end - 4)
-  }
-  
-  for (let i = start; i <= end; i++) {
-    pages.push(i)
-  }
-  
-  return pages
-})
-
-function formatDuration(seconds) {
-  if (!seconds) return '00:00'
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
-  if (h > 0) {
-    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  }
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
+const searchQuery = ref('')
+const filterStartDate = ref('')
+const filterEndDate = ref('')
 
 function formatDate(dateStr) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString(locale.value)
+    if (!dateStr) return '-'
+    return new Date(dateStr).toLocaleString(locale.value, {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
+}
+
+function formatDuration(seconds) {
+    if (!seconds) return '-'
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = seconds % 60
+    if (h > 0) return `${h}h ${m}m ${s}s`
+    if (m > 0) return `${m}m ${s}s`
+    return `${s}s`
 }
 
 function formatBytes(bytes) {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
-}
-
-function getStatusColor(status) {
-  const colors = {
-    active: 'success',
-    archived: 'warning',
-    deleted: 'error'
-  }
-  return colors[status] || 'primary'
+    if (!bytes) return '-'
+    const units = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(1024))
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
 }
 
 function applyFilters() {
-  replaysStore.setFilters(filters)
-  fetchReplays()
+    replaysStore.setFilters({
+        search: searchQuery.value,
+        startDate: filterStartDate.value,
+        endDate: filterEndDate.value
+    })
+    replaysStore.fetchReplays(true)
 }
 
-async function fetchReplays() {
-  await replaysStore.fetchReplays()
-}
-
-function goToPage(page) {
-  replaysStore.setPage(page)
-  fetchReplays()
-}
-
-function openPlayer(id) {
-  router.push(`/replays/${id}`)
+function resetFilters() {
+    searchQuery.value = ''
+    filterStartDate.value = ''
+    filterEndDate.value = ''
+    replaysStore.resetFilters()
+    replaysStore.fetchReplays(true)
 }
 
 function confirmDelete(replay) {
-  deleteModal.value = replay
-}
-
-async function deleteReplay() {
-  if (deleteModal.value) {
-    await replaysStore.deleteReplay(deleteModal.value.id)
-    deleteModal.value = null
-  }
+    if (confirm(`Tem certeza que deseja excluir este replay?`)) {
+        replaysStore.deleteReplay(replay.id)
+    }
 }
 
 onMounted(() => {
-  fetchReplays()
+    replaysStore.fetchReplays()
 })
 </script>
 
 <style scoped>
+.replays-page {
+    max-width: var(--content-max-width);
+}
+
 .page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
 }
 
-.filters-card {
-  margin-bottom: var(--spacing-lg);
+.page-header h2 {
+    margin-bottom: var(--spacing-xs);
 }
 
-.filters-grid {
-  display: flex;
-  gap: var(--spacing-md);
-  align-items: flex-end;
-  flex-wrap: wrap;
+.filters-section {
+    background: var(--bg-card);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
 }
 
-.filters-grid .form-group {
-  margin-bottom: 0;
-  flex: 1;
-  min-width: 150px;
+.search-box {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
 }
 
-.replay-name .filename {
-  font-weight: var(--font-weight-medium);
+.search-box .form-input {
+    flex: 1;
 }
 
-.actions {
-  display: flex;
-  gap: var(--spacing-xs);
+.filters-row {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
 }
 
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.filter-input {
+    width: 180px;
+}
+
+.loading-container {
+    text-align: center;
+    padding: var(--spacing-3xl);
+}
+
+.loading-container .spinner {
+    margin: 0 auto var(--spacing-md);
+}
+
+.replays-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.replay-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.replay-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--color-gray-50);
+}
+
+.replay-card-body {
+    padding: var(--spacing-md);
+}
+
+.replay-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+}
+
+.replay-info .label {
+    color: var(--text-muted);
+}
+
+.replay-card-footer {
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
+}
+
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--spacing-lg);
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
 }
 
 .pagination-info {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-/* Modal */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--z-modal-backdrop);
-}
-
-.modal {
-  background: var(--bg-card);
-  border-radius: var(--border-radius-lg);
-  padding: var(--spacing-xl);
-  max-width: 400px;
-  width: 100%;
-  z-index: var(--z-modal);
-}
-
-.modal h3 {
-  margin-bottom: var(--spacing-md);
-}
-
-.modal-actions {
-  display: flex;
-  gap: var(--spacing-md);
-  justify-content: flex-end;
-  margin-top: var(--spacing-lg);
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
 }
 
 @media (max-width: 768px) {
-  .filters-grid {
-    flex-direction: column;
-  }
-  
-  .filters-grid .form-group {
-    width: 100%;
-  }
+    .filters-section {
+        padding: var(--spacing-md);
+    }
+    
+    .search-box {
+        flex-direction: column;
+    }
+    
+    .filter-input {
+        width: 100%;
+    }
+    
+    .pagination-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .pagination {
+        justify-content: center;
+    }
 }
 </style>

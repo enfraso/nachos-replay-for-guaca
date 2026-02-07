@@ -1,5 +1,10 @@
 /**
- * Nachos Replay for Guaca - Stores Index
+ * Nachos Replay - Pinia Store Index
  */
+import { createPinia } from 'pinia'
+
+export const pinia = createPinia()
+
 export { useAuthStore } from './auth'
 export { useReplaysStore } from './replays'
+export { useStatsStore } from './stats'

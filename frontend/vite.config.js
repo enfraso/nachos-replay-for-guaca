@@ -20,7 +20,15 @@ export default defineConfig({
     },
     build: {
         outDir: 'dist',
-        assetsDir: 'assets',
-        sourcemap: false
+        sourcemap: false,
+        minify: 'terser',
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    vendor: ['vue', 'vue-router', 'pinia'],
+                    charts: ['chart.js', 'vue-chartjs']
+                }
+            }
+        }
     }
 })

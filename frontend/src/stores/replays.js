@@ -1,6 +1,6 @@
 /**
- * Nachos Replay for Guaca - Replays Store
- * Pinia store for replays state management
+ * Nachos Replay - Replays Store
+ * Pinia store for replays management
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -10,56 +10,57 @@ export const useReplaysStore = defineStore('replays', () => {
     // State
     const replays = ref([])
     const currentReplay = ref(null)
-    const total = ref(0)
-    const page = ref(1)
-    const pageSize = ref(20)
     const isLoading = ref(false)
     const error = ref(null)
 
+    // Pagination
+    const page = ref(1)
+    const perPage = ref(20)
+    const total = ref(0)
+
     // Filters
     const filters = ref({
-        query: '',
+        search: '',
         username: '',
-        sessionName: '',
-        clientIp: '',
-        dateFrom: null,
-        dateTo: null,
+        startDate: '',
+        endDate: '',
         status: ''
     })
 
     // Getters
-    const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 1)
-    const hasFilters = computed(() => {
-        return Object.values(filters.value).some(v => v !== '' && v !== null)
-    })
+    const totalPages = computed(() => Math.ceil(total.value / perPage.value))
+    const hasNextPage = computed(() => page.value < totalPages.value)
+    const hasPrevPage = computed(() => page.value > 1)
 
     // Actions
-    async function fetchReplays() {
+    async function fetchReplays(resetPage = false) {
+        if (resetPage) page.value = 1
+
         isLoading.value = true
         error.value = null
 
         try {
-            const params = new URLSearchParams()
-            params.append('page', page.value)
-            params.append('page_size', pageSize.value)
+            const params = new URLSearchParams({
+                page: page.value,
+                per_page: perPage.value
+            })
 
-            if (filters.value.query) params.append('query', filters.value.query)
+            if (filters.value.search) params.append('search', filters.value.search)
             if (filters.value.username) params.append('username', filters.value.username)
-            if (filters.value.sessionName) params.append('session_name', filters.value.sessionName)
-            if (filters.value.clientIp) params.append('client_ip', filters.value.clientIp)
-            if (filters.value.dateFrom) params.append('date_from', filters.value.dateFrom)
-            if (filters.value.dateTo) params.append('date_to', filters.value.dateTo)
+            if (filters.value.startDate) params.append('start_date', filters.value.startDate)
+            if (filters.value.endDate) params.append('end_date', filters.value.endDate)
             if (filters.value.status) params.append('status', filters.value.status)
 
-            const response = await api.get(`/api/replays?${params.toString()}`)
+            const response = await api.get(`/api/replays?${params}`)
 
-            replays.value = response.data.items
-            total.value = response.data.total
+            replays.value = response.data.items || response.data
+            total.value = response.data.total || replays.value.length
 
-            return response.data
+            return replays.value
         } catch (err) {
-            error.value = err.response?.data?.detail || 'Failed to fetch replays'
-            return null
+            error.value = 'Falha ao carregar replays'
+            console.error('Failed to fetch replays:', err)
+            return []
         } finally {
             isLoading.value = false
         }
@@ -72,76 +73,85 @@ export const useReplaysStore = defineStore('replays', () => {
         try {
             const response = await api.get(`/api/replays/${id}`)
             currentReplay.value = response.data
-            return response.data
+            return currentReplay.value
         } catch (err) {
-            error.value = err.response?.data?.detail || 'Failed to fetch replay'
+            error.value = 'Falha ao carregar replay'
+            console.error('Failed to fetch replay:', err)
             return null
         } finally {
             isLoading.value = false
         }
     }
 
-    async function deleteReplay(id, hardDelete = false) {
+    async function deleteReplay(id) {
         try {
-            await api.delete(`/api/replays/${id}?hard_delete=${hardDelete}`)
-
-            // Remove from list
+            await api.delete(`/api/replays/${id}`)
             replays.value = replays.value.filter(r => r.id !== id)
-            total.value--
-
             return true
         } catch (err) {
-            error.value = err.response?.data?.detail || 'Failed to delete replay'
+            error.value = 'Falha ao excluir replay'
             return false
         }
     }
 
-    function getStreamUrl(id) {
-        return `/api/replays/${id}/stream`
-    }
-
-    function setPage(newPage) {
-        page.value = newPage
-    }
-
     function setFilters(newFilters) {
         filters.value = { ...filters.value, ...newFilters }
-        page.value = 1 // Reset to first page
     }
 
-    function clearFilters() {
+    function resetFilters() {
         filters.value = {
-            query: '',
+            search: '',
             username: '',
-            sessionName: '',
-            clientIp: '',
-            dateFrom: null,
-            dateTo: null,
+            startDate: '',
+            endDate: '',
             status: ''
         }
         page.value = 1
+    }
+
+    function nextPage() {
+        if (hasNextPage.value) {
+            page.value++
+            fetchReplays()
+        }
+    }
+
+    function prevPage() {
+        if (hasPrevPage.value) {
+            page.value--
+            fetchReplays()
+        }
+    }
+
+    function goToPage(pageNum) {
+        if (pageNum >= 1 && pageNum <= totalPages.value) {
+            page.value = pageNum
+            fetchReplays()
+        }
     }
 
     return {
         // State
         replays,
         currentReplay,
-        total,
-        page,
-        pageSize,
         isLoading,
         error,
+        page,
+        perPage,
+        total,
         filters,
         // Getters
         totalPages,
-        hasFilters,
+        hasNextPage,
+        hasPrevPage,
         // Actions
         fetchReplays,
         fetchReplay,
         deleteReplay,
-        getStreamUrl,
-        setPage,
         setFilters,
-        clearFilters
+        resetFilters,
+        nextPage,
+        prevPage,
+        goToPage
     }
 })

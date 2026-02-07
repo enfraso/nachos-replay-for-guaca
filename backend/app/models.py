@@ -76,7 +76,12 @@ class User(Base):
     password_hash: Mapped[Optional[str]] = mapped_column(String(255))
     ldap_dn: Mapped[Optional[str]] = mapped_column(String(500))
     role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role", create_type=False),
+        Enum(
+            UserRole, 
+            name="user_role", 
+            create_type=False,
+            values_callable=lambda x: [e.value for e in x]
+        ),
         default=UserRole.VIEWER
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -203,7 +208,12 @@ class Replay(Base):
         server_default=func.now()
     )
     status: Mapped[ReplayStatus] = mapped_column(
-        Enum(ReplayStatus, name="replay_status", create_type=False),
+        Enum(
+            ReplayStatus, 
+            name="replay_status", 
+            create_type=False,
+            values_callable=lambda x: [e.value for e in x]
+        ),
         default=ReplayStatus.ACTIVE
     )
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
@@ -253,7 +263,12 @@ class AuditLog(Base):
         ForeignKey("replays.id", ondelete="SET NULL")
     )
     action: Mapped[AuditAction] = mapped_column(
-        Enum(AuditAction, name="audit_action", create_type=False),
+        Enum(
+            AuditAction, 
+            name="audit_action", 
+            create_type=False,
+            values_callable=lambda x: [e.value for e in x]
+        ),
         nullable=False
     )
     ip_address: Mapped[Optional[str]] = mapped_column(String(45))

@@ -1,367 +1,327 @@
 <template>
-  <div class="replay-player-page">
-    <!-- Header -->
-    <div class="player-header">
-      <button class="btn btn-ghost" @click="goBack">
-        ← {{ $t('common.cancel') }}
-      </button>
-      <div class="replay-info" v-if="replay">
-        <h2>{{ replay.session_name || replay.filename }}</h2>
-        <p class="text-muted">
-          {{ replay.owner_username }} • {{ formatDate(replay.session_start) }}
-          • {{ formatDuration(replay.duration_seconds) }}
-        </p>
-      </div>
-      <div class="player-controls">
-        <select v-model="playbackSpeed" class="form-select speed-select">
-          <option :value="0.5">0.5x</option>
-          <option :value="1">1x</option>
-          <option :value="2">2x</option>
-          <option :value="4">4x</option>
-        </select>
-        <button class="btn btn-secondary" @click="toggleFullscreen">
-          ⛶ {{ $t('replays.player.controls.fullscreen') }}
-        </button>
-      </div>
-    </div>
-
-    <!-- Player Container -->
-    <div 
-      ref="playerContainer"
-      class="player-container"
-      :class="{ fullscreen: isFullscreen }"
-    >
-      <div v-if="isLoading" class="player-loading">
-        <div class="spinner spinner-lg"></div>
-        <p>{{ $t('replays.player.loading') }}</p>
-      </div>
-
-      <div v-else-if="error" class="player-error">
-        <p class="text-error">{{ $t('replays.player.error') }}</p>
-        <p class="text-muted text-sm">{{ error }}</p>
-        <button class="btn btn-primary mt-md" @click="loadReplay">
-          {{ $t('common.retry') || 'Retry' }}
-        </button>
-      </div>
-
-      <div v-else class="player-display" ref="displayRef">
-        <!-- Guacamole display will be rendered here -->
-        <canvas ref="canvasRef" class="replay-canvas"></canvas>
-      </div>
-
-      <!-- Playback Controls -->
-      <div class="playback-bar" v-if="!isLoading && !error">
-        <button class="control-btn" @click="togglePlay">
-          {{ isPlaying ? '⏸' : '▶' }}
-        </button>
-        <div class="progress-container">
-          <input
-            type="range"
-            class="progress-bar"
-            v-model="currentPosition"
-            :max="duration"
-            @input="seek"
-          />
-          <div class="time-display">
-            {{ formatTime(currentPosition) }} / {{ formatTime(duration) }}
-          </div>
+    <div class="player-page">
+        <!-- Loading -->
+        <div v-if="isLoading" class="loading-container">
+            <div class="spinner spinner-lg"></div>
+            <p>{{ $t('player.loading') }}</p>
         </div>
-      </div>
+
+        <!-- Player Content -->
+        <div v-else-if="replay" class="player-container">
+            <!-- Player Header -->
+            <div class="player-header">
+                <router-link to="/replays" class="btn btn-secondary btn-sm">
+                    ← {{ $t('common.back') }}
+                </router-link>
+                <h2>{{ $t('player.title') }}</h2>
+                <div class="player-meta">
+                    <span class="badge badge-primary">{{ replay.protocol?.toUpperCase() || 'RDP' }}</span>
+                </div>
+            </div>
+
+            <!-- Player Area -->
+            <div class="player-area">
+                <div class="player-wrapper" ref="playerRef">
+                    <!-- Guacamole player would be embedded here -->
+                    <div class="player-placeholder">
+                        <div class="player-icon">🎬</div>
+                        <p>Player de Replay</p>
+                        <p class="text-muted text-sm">Integração com Guacamole Client</p>
+                    </div>
+                </div>
+
+                <!-- Player Controls -->
+                <div class="player-controls">
+                    <div class="controls-left">
+                        <button class="btn btn-primary btn-icon" @click="togglePlay">
+                            {{ isPlaying ? '⏸️' : '▶️' }}
+                        </button>
+                        <button class="btn btn-secondary btn-icon" @click="stop">
+                            ⏹️
+                        </button>
+                    </div>
+                    
+                    <div class="controls-center">
+                        <div class="progress-bar">
+                            <div class="progress-fill" :style="{ width: progress + '%' }"></div>
+                        </div>
+                        <span class="time-display">{{ formatTime(currentTime) }} / {{ formatTime(totalTime) }}</span>
+                    </div>
+                    
+                    <div class="controls-right">
+                        <select v-model="playbackSpeed" class="form-select speed-select">
+                            <option value="0.5">0.5x</option>
+                            <option value="1">1x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="2">2x</option>
+                            <option value="4">4x</option>
+                        </select>
+                        <button class="btn btn-ghost btn-icon" @click="toggleFullscreen">
+                            🔲
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Replay Info -->
+            <div class="replay-info card">
+                <div class="card-header">
+                    <h3>{{ $t('player.info') }}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">{{ $t('common.user') }}</span>
+                            <span class="info-value">{{ replay.username }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">{{ $t('replays.hostname') }}</span>
+                            <span class="info-value">{{ replay.hostname || '-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">{{ $t('replays.protocol') }}</span>
+                            <span class="info-value">{{ replay.protocol?.toUpperCase() || 'RDP' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">{{ $t('replays.startDate') }}</span>
+                            <span class="info-value">{{ formatDate(replay.start_time) }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">{{ $t('replays.duration') }}</span>
+                            <span class="info-value">{{ formatDuration(replay.duration) }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">{{ $t('replays.size') }}</span>
+                            <span class="info-value">{{ formatBytes(replay.size_bytes) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error State -->
+        <div v-else class="empty-state">
+            <div class="empty-state-icon">❌</div>
+            <div class="empty-state-title">{{ $t('common.error') }}</div>
+            <router-link to="/replays" class="btn btn-primary">
+                {{ $t('common.back') }}
+            </router-link>
+        </div>
     </div>
-  </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useReplaysStore } from '@/stores/replays'
-import api from '@/composables/useApi'
 
 const route = useRoute()
-const router = useRouter()
 const { locale } = useI18n()
 const replaysStore = useReplaysStore()
 
-const playerContainer = ref(null)
-const displayRef = ref(null)
-const canvasRef = ref(null)
-
-const replay = ref(null)
+const playerRef = ref(null)
 const isLoading = ref(true)
-const error = ref(null)
 const isPlaying = ref(false)
-const isFullscreen = ref(false)
-const playbackSpeed = ref(1)
-const currentPosition = ref(0)
-const duration = ref(0)
+const currentTime = ref(0)
+const playbackSpeed = ref('1')
 
-// Simulated playback state
-let playbackInterval = null
-let replayData = null
+const replay = computed(() => replaysStore.currentReplay)
+const totalTime = computed(() => replay.value?.duration || 0)
+const progress = computed(() => totalTime.value > 0 ? (currentTime.value / totalTime.value) * 100 : 0)
 
 function formatDate(dateStr) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString(locale.value)
+    if (!dateStr) return '-'
+    return new Date(dateStr).toLocaleString(locale.value)
 }
 
 function formatDuration(seconds) {
-  if (!seconds) return '00:00'
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
-  if (h > 0) {
-    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  }
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    if (!seconds) return '-'
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = seconds % 60
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
-function formatTime(ms) {
-  const seconds = Math.floor(ms / 1000)
-  return formatDuration(seconds)
+function formatBytes(bytes) {
+    if (!bytes) return '-'
+    const units = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(1024))
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
 }
 
-async function loadReplay() {
-  isLoading.value = true
-  error.value = null
-
-  try {
-    // Fetch replay details
-    const replayId = route.params.id
-    const replayDetails = await replaysStore.fetchReplay(replayId)
-    
-    if (!replayDetails) {
-      throw new Error('Replay not found')
-    }
-
-    replay.value = replayDetails
-    duration.value = (replayDetails.duration_seconds || 0) * 1000
-
-    // In a real implementation, you would:
-    // 1. Load the Guacamole JS library
-    // 2. Create a Guac.SessionRecording from the stream URL
-    // 3. Connect the display to the canvas
-
-    // For now, we show a placeholder message
-    if (canvasRef.value) {
-      const ctx = canvasRef.value.getContext('2d')
-      canvasRef.value.width = 800
-      canvasRef.value.height = 600
-      
-      ctx.fillStyle = '#1a1a2e'
-      ctx.fillRect(0, 0, 800, 600)
-      
-      ctx.fillStyle = '#ffffff'
-      ctx.font = '20px Inter, sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText('Guacamole Replay Player', 400, 280)
-      ctx.font = '14px Inter, sans-serif'
-      ctx.fillStyle = '#666'
-      ctx.fillText('Configure guacamole-common-js library to enable playback', 400, 320)
-      ctx.fillText(`File: ${replayDetails.filename}`, 400, 350)
-    }
-
-    isLoading.value = false
-  } catch (err) {
-    console.error('Failed to load replay:', err)
-    error.value = err.message || 'Failed to load replay'
-    isLoading.value = false
-  }
+function formatTime(seconds) {
+    const m = Math.floor(seconds / 60)
+    const s = Math.floor(seconds % 60)
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
 function togglePlay() {
-  isPlaying.value = !isPlaying.value
-
-  if (isPlaying.value) {
-    startPlayback()
-  } else {
-    stopPlayback()
-  }
+    isPlaying.value = !isPlaying.value
 }
 
-function startPlayback() {
-  if (playbackInterval) clearInterval(playbackInterval)
-  
-  playbackInterval = setInterval(() => {
-    currentPosition.value += 100 * playbackSpeed.value
-    
-    if (currentPosition.value >= duration.value) {
-      currentPosition.value = duration.value
-      stopPlayback()
-    }
-  }, 100)
-}
-
-function stopPlayback() {
-  isPlaying.value = false
-  if (playbackInterval) {
-    clearInterval(playbackInterval)
-    playbackInterval = null
-  }
-}
-
-function seek() {
-  // In a real implementation, this would seek the Guacamole recording
-  console.log('Seeking to:', currentPosition.value)
+function stop() {
+    isPlaying.value = false
+    currentTime.value = 0
 }
 
 function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    playerContainer.value?.requestFullscreen()
-    isFullscreen.value = true
-  } else {
-    document.exitFullscreen()
-    isFullscreen.value = false
-  }
+    if (playerRef.value) {
+        if (document.fullscreenElement) {
+            document.exitFullscreen()
+        } else {
+            playerRef.value.requestFullscreen()
+        }
+    }
 }
 
-function goBack() {
-  router.push('/replays')
-}
-
-watch(playbackSpeed, (newSpeed) => {
-  if (isPlaying.value) {
-    stopPlayback()
-    startPlayback()
-  }
-})
-
-onMounted(() => {
-  loadReplay()
-  
-  document.addEventListener('fullscreenchange', () => {
-    isFullscreen.value = !!document.fullscreenElement
-  })
+onMounted(async () => {
+    const id = route.params.id
+    await replaysStore.fetchReplay(id)
+    isLoading.value = false
 })
 
 onUnmounted(() => {
-  stopPlayback()
+    replaysStore.currentReplay = null
 })
 </script>
 
 <style scoped>
-.replay-player-page {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - var(--header-height) - var(--spacing-2xl) * 2);
+.player-page {
+    max-width: var(--content-max-width);
+}
+
+.loading-container {
+    text-align: center;
+    padding: var(--spacing-3xl);
 }
 
 .player-header {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
 }
 
-.replay-info {
-  flex: 1;
+.player-header h2 {
+    flex: 1;
+    margin: 0;
 }
 
-.replay-info h2 {
-  margin-bottom: var(--spacing-xs);
+.player-area {
+    background: var(--color-gray-900);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: var(--spacing-lg);
+}
+
+.player-wrapper {
+    aspect-ratio: 16 / 9;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.player-placeholder {
+    text-align: center;
+    color: var(--color-gray-400);
+}
+
+.player-icon {
+    font-size: 4rem;
+    margin-bottom: var(--spacing-md);
 }
 
 .player-controls {
-  display: flex;
-  gap: var(--spacing-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--color-gray-800);
 }
 
-.speed-select {
-  width: auto;
+.controls-left,
+.controls-right {
+    display: flex;
+    gap: var(--spacing-sm);
 }
 
-.player-container {
-  flex: 1;
-  background: var(--bg-dark);
-  border-radius: var(--border-radius-lg);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.player-container.fullscreen {
-  border-radius: 0;
-}
-
-.player-loading,
-.player-error {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-inverse);
-}
-
-.player-display {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.replay-canvas {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.playback-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: rgba(0, 0, 0, 0.8);
-}
-
-.control-btn {
-  width: 40px;
-  height: 40px;
-  background: var(--color-primary-500);
-  border: none;
-  border-radius: 50%;
-  color: white;
-  font-size: 16px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.control-btn:hover {
-  background: var(--color-primary-400);
-  transform: scale(1.1);
-}
-
-.progress-container {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
+.controls-center {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
 }
 
 .progress-bar {
-  flex: 1;
-  height: 6px;
-  -webkit-appearance: none;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-  cursor: pointer;
+    flex: 1;
+    height: 6px;
+    background: var(--color-gray-600);
+    border-radius: var(--radius-full);
+    cursor: pointer;
 }
 
-.progress-bar::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  background: var(--color-accent-500);
-  border-radius: 50%;
-  cursor: pointer;
+.progress-fill {
+    height: 100%;
+    background: var(--color-primary-500);
+    border-radius: var(--radius-full);
+    transition: width 0.1s linear;
 }
 
 .time-display {
-  font-size: var(--font-size-sm);
-  color: rgba(255, 255, 255, 0.7);
-  font-family: monospace;
-  min-width: 120px;
-  text-align: right;
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-300);
+    white-space: nowrap;
+}
+
+.speed-select {
+    width: 70px;
+    padding: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    background: var(--color-gray-700);
+    border-color: var(--color-gray-600);
+    color: white;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-md);
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.info-label {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-xs);
+}
+
+.info-value {
+    font-weight: var(--font-weight-medium);
+}
+
+@media (max-width: 768px) {
+    .player-header {
+        flex-wrap: wrap;
+    }
+    
+    .player-controls {
+        flex-wrap: wrap;
+    }
+    
+    .controls-center {
+        order: 3;
+        width: 100%;
+        margin-top: var(--spacing-sm);
+    }
+    
+    .info-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 </style>

@@ -1,6 +1,6 @@
 /**
- * Nachos Replay for Guaca - Auth Store
- * Pinia store for authentication state management
+ * Nachos Replay - Auth Store
+ * Pinia store for authentication state
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -35,12 +35,10 @@ export const useAuthStore = defineStore('auth', () => {
             localStorage.setItem('accessToken', response.data.access_token)
             localStorage.setItem('refreshToken', response.data.refresh_token)
 
-            // Fetch user info
             await fetchUser()
-
             return true
         } catch (err) {
-            error.value = err.response?.data?.detail || 'Login failed'
+            error.value = err.response?.data?.detail || 'Falha no login. Verifique suas credenciais.'
             return false
         } finally {
             isLoading.value = false
@@ -103,7 +101,6 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = null
     }
 
-    // Initialize - fetch user if token exists
     async function init() {
         if (accessToken.value) {
             await fetchUser()

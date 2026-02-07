@@ -1,5 +1,5 @@
 /**
- * Nachos Replay for Guaca - Vue Router
+ * Nachos Replay - Vue Router
  */
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -70,17 +70,17 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
     const authStore = useAuthStore()
 
-    // Initialize auth store if needed
+    // Initialize auth if token exists but user not loaded
     if (!authStore.user && authStore.accessToken) {
         await authStore.init()
     }
 
-    // Check if route requires authentication
+    // Check authentication
     if (to.meta.requiresAuth !== false && !authStore.isAuthenticated) {
         return next({ name: 'Login', query: { redirect: to.fullPath } })
     }
 
-    // Check if route requires specific role
+    // Check role permissions
     if (to.meta.requiresRole) {
         const userRole = authStore.userRole
         if (!to.meta.requiresRole.includes(userRole)) {
