@@ -401,6 +401,8 @@ MIT License - Veja [LICENSE](LICENSE) para detalhes.
 
 ---
 
+![2026-02-08 10-35-19](https://github.com/user-attachments/assets/095c5c9f-7d46-43f9-8d3c-7c18d7a14ec8)
+
 ## 🤝 Contribuição
 
 1. Fork o repositório
@@ -408,3 +410,4 @@ MIT License - Veja [LICENSE](LICENSE) para detalhes.
 3. Commit suas alterações (`git commit -m 'Add nova feature'`)
 4. Push para a branch (`git push origin feature/nova-feature`)
 5. Abra um Pull Request
+
