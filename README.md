@@ -170,6 +170,29 @@ RETENTION_DAYS=365
 MAX_STORAGE_GB=500
 ```
 
+### 🎨 Personalização (Branding)
+
+Para customizar o nome e logo do sistema ao redistribuir:
+
+```env
+# Nome do sistema (aparece no login e navbar)
+VITE_APP_NAME=Seu Sistema de Replays
+
+# Logo customizada (coloque em frontend/public/assets/)
+VITE_LOGO_URL=/assets/sua-logo.png
+
+# Emoji alternativo (usado se não houver logo)
+VITE_LOGO_EMOJI=🔒
+
+# Texto no rodapé do login
+VITE_FOOTER_TEXT=© 2026 Sua Empresa
+```
+
+**Para aplicar:**
+1. Edite o `.env` com as variáveis acima
+2. Se usar logo, copie para `frontend/public/assets/`
+3. Reconstrua: `docker compose up -d --build frontend`
+
 ---
 
 ## 📡 API Reference

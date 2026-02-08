@@ -5,8 +5,9 @@ Endpoints for replay management and streaming.
 from typing import Optional
 from uuid import UUID
 import math
+import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query, File, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,8 +22,11 @@ from app.services.audit_service import AuditService
 from app.api.deps import (
     get_current_active_user, get_admin_user,
     get_replay_service, get_audit_service,
-    get_client_ip, get_allowed_usernames
+    get_client_ip, get_allowed_usernames,
+    get_user_from_token_or_query
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/replays", tags=["Replays"])
 
@@ -153,10 +157,10 @@ async def get_replay(
 async def stream_replay(
     replay_id: UUID,
     request: Request,
-    current_user: User = Depends(get_current_active_user),
-    allowed_usernames: Optional[list] = Depends(get_allowed_usernames),
+    current_user: User = Depends(get_user_from_token_or_query),
     replay_service: ReplayService = Depends(get_replay_service),
-    audit_service: AuditService = Depends(get_audit_service)
+    audit_service: AuditService = Depends(get_audit_service),
+    db: AsyncSession = Depends(get_db)
 ):
     """Stream replay file content."""
     replay = await replay_service.get_replay(replay_id)
@@ -166,14 +170,6 @@ async def stream_replay(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Replay not found"
         )
-    
-    # Check access
-    if allowed_usernames is not None:
-        if replay.owner_username not in allowed_usernames and replay.owner_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied to this replay"
-            )
     
     file_handle = await replay_service.get_replay_file(replay)
     
@@ -203,10 +199,13 @@ async def stream_replay(
     
     return StreamingResponse(
         iterfile(),
-        media_type="application/octet-stream",
+        media_type="text/plain",
         headers={
-            "Content-Disposition": f'attachment; filename="{replay.filename}"',
-            "Content-Length": str(replay.file_size)
+            "Content-Disposition": f'inline; filename="{replay.filename}"',
+            "Content-Length": str(replay.file_size),
+            "Cache-Control": "no-cache",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Expose-Headers": "Content-Length, Content-Type"
         }
     )
 
@@ -243,10 +242,12 @@ async def update_replay(
 
 @router.delete("/{replay_id}")
 async def delete_replay(
+    request: Request,
     replay_id: UUID,
     hard_delete: bool = Query(False, description="Permanently delete file"),
     current_user: User = Depends(get_admin_user),
-    replay_service: ReplayService = Depends(get_replay_service)
+    replay_service: ReplayService = Depends(get_replay_service),
+    audit_service: AuditService = Depends(get_audit_service)
 ):
     """Delete or archive a replay (admin only)."""
     replay = await replay_service.get_replay(replay_id)
@@ -257,6 +258,10 @@ async def delete_replay(
             detail="Replay not found"
         )
     
+    # Guardar informações antes de deletar
+    replay_filename = replay.filename
+    replay_owner = replay.owner_username
+    
     success = await replay_service.delete_replay(replay, hard_delete=hard_delete)
     
     if not success:
@@ -265,4 +270,133 @@ async def delete_replay(
             detail="Failed to delete replay"
         )
     
+    # Registrar auditoria APÓS deletar com sucesso
+    await audit_service.log(
+        action=AuditAction.DELETE,
+        user_id=current_user.id,
+        username=current_user.username,
+        replay_id=replay_id,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent", ""),
+        details={
+            "filename": replay_filename,
+            "owner": replay_owner,
+            "hard_delete": hard_delete
+        }
+    )
+    
     return {"message": "Replay deleted successfully"}
+
+
+@router.post("/upload", response_model=ReplayDetail)
+async def upload_replay(
+    file: UploadFile = File(...),
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user),
+    replay_service: ReplayService = Depends(get_replay_service),
+    audit_service: AuditService = Depends(get_audit_service),
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload a replay file (.guac) for immediate playback."""
+    from pathlib import Path
+    from datetime import datetime, timezone
+    import shutil
+    
+    # Validate file extension
+    if not file.filename.endswith('.guac'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only .guac files are allowed"
+        )
+    
+    # Validate file size (max 500MB)
+    max_size = 500 * 1024 * 1024  # 500MB
+    file.file.seek(0, 2)  # Seek to end
+    file_size = file.file.tell()
+    file.file.seek(0)  # Reset to beginning
+    
+    if file_size > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File too large. Maximum size is {max_size // (1024*1024)}MB"
+        )
+    
+    if file_size == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File is empty"
+        )
+    
+    try:
+        # Create storage directory structure: uploads/YYYY/MM/
+        now = datetime.now(timezone.utc)
+        storage_path = Path(replay_service.storage_path) / "uploads" / str(now.year) / f"{now.month:02d}"
+        storage_path.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename
+        from uuid import uuid4
+        unique_filename = f"{current_user.username}_{uuid4().hex[:8]}_{file.filename}"
+        target_file = storage_path / unique_filename
+        
+        # Save file
+        with open(target_file, 'wb') as f:
+            shutil.copyfileobj(file.file, f)
+        
+        # Extract duration from file
+        duration = await replay_service._extract_replay_duration(target_file)
+        
+        # Create database record
+        from app.models import Replay, ReplayStatus
+        replay = Replay(
+            filename=unique_filename,
+            original_path=file.filename,
+            stored_path=str(target_file),
+            session_name=file.filename.replace('.guac', ''),
+            owner_id=current_user.id,
+            owner_username=current_user.username,
+            client_ip=get_client_ip(request) if request else None,
+            file_size=file_size,
+            duration_seconds=duration,
+            session_start=now,
+            session_end=now if duration == 0 else now,
+            status=ReplayStatus.ACTIVE,
+            metadata_json={
+                "uploaded": True,
+                "upload_time": now.isoformat(),
+                "original_filename": file.filename
+            }
+        )
+        
+        db.add(replay)
+        await db.flush()
+        await db.refresh(replay)
+        
+        # Log upload action
+        await audit_service.log(
+            action=AuditAction.CREATE,
+            user_id=current_user.id,
+            username=current_user.username,
+            replay_id=replay.id,
+            ip_address=get_client_ip(request) if request else None,
+            user_agent=request.headers.get("User-Agent", "") if request else "",
+            details={
+                "action": "upload",
+                "filename": file.filename,
+                "size_bytes": file_size
+            }
+        )
+        
+        await db.commit()
+        
+        return ReplayDetail.model_validate(replay)
+        
+    except Exception as e:
+        # Clean up file if database operation failed
+        if target_file.exists():
+            target_file.unlink()
+        
+        logger.error(f"Failed to upload replay: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload replay: {str(e)}"
+        )

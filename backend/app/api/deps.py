@@ -80,6 +80,80 @@ async def get_current_user(
     return user
 
 
+async def get_user_from_token_or_query(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """
+    Get user from JWT token in header OR query parameter.
+    Supports both Authorization header and ?token= query param for streaming.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    # Try to get token from header first
+    token = None
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+    
+    # Fall back to query parameter if no header token
+    if not token:
+        token = request.query_params.get("token")
+    
+    if not token:
+        raise credentials_exception
+    
+    payload = decode_token(token)
+    
+    if not payload:
+        raise credentials_exception
+    
+    # Check token type
+    if payload.get("type") != "access":
+        raise credentials_exception
+    
+    # Check if token is blacklisted
+    jti = payload.get("jti")
+    if jti:
+        blacklisted = await db.execute(
+            select(TokenBlacklist).where(TokenBlacklist.token_jti == jti)
+        )
+        if blacklisted.scalar_one_or_none():
+            raise credentials_exception
+    
+    # Get user
+    user_id = payload.get("sub")
+    if not user_id:
+        raise credentials_exception
+    
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise credentials_exception
+    
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.groups))
+        .where(User.id == user_uuid)
+    )
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise credentials_exception
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled"
+        )
+    
+    return user
+
+
 async def get_current_active_user(
     current_user: User = Depends(get_current_user)
 ) -> User:

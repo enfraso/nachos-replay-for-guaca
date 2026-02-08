@@ -42,6 +42,17 @@ class AuditAction(str, enum.Enum):
     CREATE = "create"
     UPDATE = "update"
     DELETE = "delete"
+    PLAY_START = "play_start"      # Início da reprodução
+    PLAY_COMPLETE = "play_complete"  # Reprodução até o fim
+    UPLOAD = "upload"              # Upload de replay
+    AUTH_FAILED = "auth_failed"    # Tentativa de login falha
+
+
+class StorageTier(str, enum.Enum):
+    """Storage tier for replay files."""
+    HOT = "hot"      # 0-4 meses - acesso imediato
+    WARM = "warm"    # 4 meses - 2 anos - acesso normal
+    COLD = "cold"    # > 2 anos - arquivado, possivelmente comprimido
 
 
 # Association table for user-group many-to-many
@@ -217,6 +228,24 @@ class Replay(Base):
         default=ReplayStatus.ACTIVE
     )
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    
+    # Campos de armazenamento inteligente
+    protocol: Mapped[Optional[str]] = mapped_column(String(20))  # RDP, SSH, VNC, TELNET
+    hostname: Mapped[Optional[str]] = mapped_column(String(255))  # Host de destino
+    connection_name: Mapped[Optional[str]] = mapped_column(String(255))  # Nome da conexão
+    storage_tier: Mapped[StorageTier] = mapped_column(
+        Enum(
+            StorageTier,
+            name="storage_tier",
+            create_type=False,
+            values_callable=lambda x: [e.value for e in x]
+        ),
+        default=StorageTier.HOT
+    )
+    checksum_sha256: Mapped[Optional[str]] = mapped_column(String(64))  # Hash para integridade
+    is_compressed: Mapped[bool] = mapped_column(Boolean, default=False)
+    original_size: Mapped[Optional[int]] = mapped_column(BigInteger)  # Tamanho antes de compressão
+    
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now()
@@ -241,6 +270,8 @@ class Replay(Base):
         Index("idx_replays_owner_username", "owner_username"),
         Index("idx_replays_status", "status"),
         Index("idx_replays_session_start", "session_start"),
+        Index("idx_replays_storage_tier", "storage_tier"),
+        Index("idx_replays_protocol", "protocol"),
     )
 
 

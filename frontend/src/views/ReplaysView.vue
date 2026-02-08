@@ -6,6 +6,22 @@
                 <h2>{{ $t('replays.title') }}</h2>
                 <p class="text-muted">{{ $t('replays.subtitle') }}</p>
             </div>
+            <button class="btn btn-primary" @click="showUploadModal = true">
+                📤 {{ $t('upload.title') || 'Upload Replay' }}
+            </button>
+        </div>
+
+        <!-- Upload Modal -->
+        <div v-if="showUploadModal" class="modal-overlay" @click.self="showUploadModal = false">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>{{ $t('upload.title') || 'Upload Replay' }}</h3>
+                    <button class="btn btn-ghost btn-sm" @click="showUploadModal = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <UploadReplay @uploaded="handleUploadSuccess" @close="showUploadModal = false" />
+                </div>
+            </div>
         </div>
 
         <!-- Filters -->
@@ -162,6 +178,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useReplaysStore } from '@/stores/replays'
+import UploadReplay from '@/components/UploadReplay.vue'
 
 const { locale } = useI18n()
 const authStore = useAuthStore()
@@ -170,6 +187,7 @@ const replaysStore = useReplaysStore()
 const searchQuery = ref('')
 const filterStartDate = ref('')
 const filterEndDate = ref('')
+const showUploadModal = ref(false)
 
 function formatDate(dateStr) {
     if (!dateStr) return '-'
@@ -222,6 +240,12 @@ function confirmDelete(replay) {
     }
 }
 
+function handleUploadSuccess(replay) {
+    showUploadModal.value = false
+    // Refresh list
+    replaysStore.fetchReplays(true)
+}
+
 onMounted(() => {
     replaysStore.fetchReplays()
 })
@@ -233,11 +257,53 @@ onMounted(() => {
 }
 
 .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
     margin-bottom: var(--spacing-lg);
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
 }
 
 .page-header h2 {
     margin-bottom: var(--spacing-xs);
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--spacing-md);
+}
+
+.modal-content {
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.modal-body {
+    padding: var(--spacing-lg);
 }
 
 .filters-section {

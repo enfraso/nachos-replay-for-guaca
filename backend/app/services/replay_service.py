@@ -74,12 +74,11 @@ class ReplayService:
         """Import a single replay file into the system."""
         try:
             # Parse filename for metadata
-            # Guacamole format: username_sessionid_timestamp.guac
             metadata = self._parse_replay_filename(source_file.name)
             
-            # Create storage directory structure: YYYY/MM/
+            # Create storage directory structure: hot/YYYY/MM/ (novos replays vão para HOT)
             now = datetime.now(timezone.utc)
-            target_dir = self.storage_path / str(now.year) / f"{now.month:02d}"
+            target_dir = self.storage_path / "hot" / str(now.year) / f"{now.month:02d}"
             target_dir.mkdir(parents=True, exist_ok=True)
             
             # Copy file to storage
@@ -91,6 +90,12 @@ class ReplayService:
             
             # Try to extract duration from replay file
             duration = await self._extract_replay_duration(target_file)
+            
+            # Calculate checksum
+            checksum = await self._calculate_checksum(target_file)
+            
+            # Import StorageTier
+            from app.models import StorageTier
             
             # Create database record
             replay = Replay(
@@ -105,6 +110,14 @@ class ReplayService:
                 session_start=metadata.get("timestamp"),
                 session_end=metadata.get("timestamp") + timedelta(seconds=duration) if metadata.get("timestamp") and duration else None,
                 status=ReplayStatus.ACTIVE,
+                # Novos campos de armazenamento inteligente
+                protocol=metadata.get("protocol"),
+                hostname=metadata.get("hostname"),
+                connection_name=metadata.get("connection_name"),
+                storage_tier=StorageTier.HOT,
+                checksum_sha256=checksum,
+                is_compressed=False,
+                original_size=file_stats.st_size,
                 metadata_json=metadata
             )
             
@@ -128,23 +141,60 @@ class ReplayService:
             return None
     
     def _parse_replay_filename(self, filename: str) -> Dict[str, Any]:
-        """Parse Guacamole replay filename for metadata."""
+        """
+        Parse Guacamole replay filename for metadata.
+        
+        Formatos suportados:
+        - username_protocol_hostname_timestamp.guac
+        - username_connectionname_timestamp.guac
+        - connectionid_timestamp.guac
+        - protocol-hostname_timestamp.guac
+        """
         metadata = {
             "original_filename": filename,
             "session_name": filename.replace(".guac", "")
         }
         
-        # Try to parse common formats
-        # Format 1: username_connection_timestamp.guac
-        # Format 2: connection-id_timestamp.guac
-        
         name_without_ext = filename.replace(".guac", "")
         parts = name_without_ext.split("_")
         
+        # Tentar detectar protocolo por padrões conhecidos
+        protocols = ["rdp", "ssh", "vnc", "telnet", "kubernetes"]
+        detected_protocol = None
+        
+        for part in parts:
+            part_lower = part.lower()
+            for proto in protocols:
+                if proto in part_lower:
+                    detected_protocol = proto.upper()
+                    # Tentar extrair hostname após o protocolo
+                    if "-" in part:
+                        # Formato: protocol-hostname
+                        proto_parts = part.split("-", 1)
+                        if len(proto_parts) > 1:
+                            metadata["hostname"] = proto_parts[1]
+                    break
+            if detected_protocol:
+                break
+        
+        if detected_protocol:
+            metadata["protocol"] = detected_protocol
+        
         if len(parts) >= 2:
+            # Primeiro elemento geralmente é username
             metadata["username"] = parts[0]
             
-            # Try to parse timestamp from last part
+            # Se temos mais de 2 partes, a do meio pode ser connection_name ou hostname
+            if len(parts) >= 3:
+                middle_part = parts[1]
+                
+                # Verificar se é um hostname (contém pontos ou parece ser IP)
+                if "." in middle_part or re.match(r'^[\d]+$', middle_part):
+                    metadata["hostname"] = middle_part
+                else:
+                    metadata["connection_name"] = middle_part
+            
+            # Tentar parsear timestamp do último elemento
             try:
                 timestamp_str = parts[-1]
                 if len(timestamp_str) == 13:  # Milliseconds
@@ -190,6 +240,19 @@ class ReplayService:
         except Exception as e:
             logger.debug(f"Could not extract duration from {file_path}: {e}")
             return 0
+    
+    async def _calculate_checksum(self, file_path: Path) -> str:
+        """Calculate SHA-256 checksum for a file."""
+        import hashlib
+        try:
+            sha256_hash = hashlib.sha256()
+            with open(file_path, 'rb') as f:
+                for chunk in iter(lambda: f.read(8192), b""):
+                    sha256_hash.update(chunk)
+            return sha256_hash.hexdigest()
+        except Exception as e:
+            logger.debug(f"Could not calculate checksum for {file_path}: {e}")
+            return ""
     
     async def get_replay(self, replay_id: UUID) -> Optional[Replay]:
         """Get a single replay by ID."""

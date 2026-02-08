@@ -4,8 +4,14 @@
             <!-- Logo -->
             <div class="login-header">
                 <div class="logo">
-                    <span class="logo-icon">🌮</span>
-                    <h1>Nachos Replay</h1>
+                    <img 
+                        v-if="branding.logoUrl" 
+                        :src="branding.logoUrl" 
+                        :alt="branding.appName"
+                        class="logo-image"
+                    />
+                    <span v-else class="logo-icon">{{ branding.logoEmoji }}</span>
+                    <h1>{{ branding.appName }}</h1>
                 </div>
                 <p class="subtitle">{{ $t('auth.loginSubtitle') }}</p>
             </div>
@@ -56,27 +62,16 @@
                 </button>
             </form>
 
-            <!-- Demo Credentials -->
-            <div class="demo-info">
-                <p>Usuários de teste:</p>
-                <div class="demo-users">
-                    <button @click="fillDemo('admin', 'admin123')" class="demo-btn">
-                        admin / admin123
-                    </button>
-                    <button @click="fillDemo('viewer', 'viewer123')" class="demo-btn">
-                        viewer / viewer123
-                    </button>
-                    <button @click="fillDemo('auditor', 'auditor123')" class="demo-btn">
-                        auditor / auditor123
-                    </button>
-                </div>
+            <!-- Footer -->
+            <div class="login-footer">
+                <p>{{ branding.footerText }}</p>
             </div>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -86,6 +81,14 @@ const authStore = useAuthStore()
 
 const username = ref('')
 const password = ref('')
+
+// Configuração de branding - facilmente customizável via variáveis de ambiente
+const branding = computed(() => ({
+    appName: import.meta.env.VITE_APP_NAME || 'Nachos Replay',
+    logoUrl: import.meta.env.VITE_LOGO_URL || '',  // URL da logo customizada
+    logoEmoji: import.meta.env.VITE_LOGO_EMOJI || '🌮',
+    footerText: import.meta.env.VITE_FOOTER_TEXT || ''
+}))
 
 async function handleLogin() {
     authStore.clearError()
@@ -97,17 +100,17 @@ async function handleLogin() {
         router.push(redirect)
     }
 }
-
-function fillDemo(user, pass) {
-    username.value = user
-    password.value = pass
-}
 </script>
 
 <style scoped>
 .login-page {
+    min-height: 100vh;
     width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: var(--spacing-lg);
+    background: linear-gradient(135deg, var(--color-gray-900) 0%, var(--color-gray-800) 100%);
 }
 
 .login-card {
@@ -148,6 +151,12 @@ function fillDemo(user, pass) {
     font-size: 2.5rem;
 }
 
+.logo-image {
+    height: 48px;
+    width: auto;
+    object-fit: contain;
+}
+
 .logo h1 {
     font-size: var(--font-size-2xl);
     background: linear-gradient(135deg, var(--color-primary-500), var(--color-accent-500));
@@ -171,39 +180,16 @@ function fillDemo(user, pass) {
     justify-content: center;
 }
 
-.demo-info {
-    padding-top: var(--spacing-lg);
-    border-top: 1px solid var(--border-color);
+.login-footer {
     text-align: center;
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
 }
 
-.demo-info p {
+.login-footer p {
     font-size: var(--font-size-xs);
     color: var(--text-muted);
-    margin-bottom: var(--spacing-sm);
-}
-
-.demo-users {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-}
-
-.demo-btn {
-    padding: var(--spacing-xs) var(--spacing-sm);
-    background: var(--color-gray-100);
-    border: none;
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-xs);
-    font-family: monospace;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.demo-btn:hover {
-    background: var(--color-primary-100);
-    color: var(--color-primary-600);
+    margin: 0;
 }
 
 @media (max-width: 768px) {

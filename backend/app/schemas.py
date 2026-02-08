@@ -35,6 +35,16 @@ class AuditActionEnum(str, Enum):
     CREATE = "create"
     UPDATE = "update"
     DELETE = "delete"
+    PLAY_START = "play_start"
+    PLAY_COMPLETE = "play_complete"
+    UPLOAD = "upload"
+    AUTH_FAILED = "auth_failed"
+
+
+class StorageTierEnum(str, Enum):
+    HOT = "hot"      # 0-4 meses
+    WARM = "warm"    # 4 meses - 2 anos
+    COLD = "cold"    # > 2 anos
 
 
 # ============================================
@@ -200,6 +210,10 @@ class ReplayResponse(ReplayBase):
     session_end: Optional[datetime]
     imported_at: datetime
     status: ReplayStatusEnum
+    protocol: Optional[str] = None
+    hostname: Optional[str] = None
+    connection_name: Optional[str] = None
+    storage_tier: StorageTierEnum = StorageTierEnum.HOT
     owner: Optional[UserBasic] = None
     
     model_config = ConfigDict(from_attributes=True)
@@ -225,6 +239,9 @@ class ReplaySearch(BaseModel):
     status: Optional[ReplayStatusEnum] = None
     min_duration: Optional[int] = None
     max_duration: Optional[int] = None
+    protocol: Optional[str] = None
+    hostname: Optional[str] = None
+    storage_tier: Optional[StorageTierEnum] = None
 
 
 # ============================================

@@ -120,7 +120,8 @@ class AuditService:
             offset = (pagination.page - 1) * pagination.page_size
             query = query.offset(offset).limit(pagination.page_size)
         else:
-            query = query.order_by(AuditLog.created_at.desc()).limit(100)
+            # Para exportação sem paginação, usar limite alto
+            query = query.order_by(AuditLog.created_at.desc()).limit(10000)
         
         result = await self.db.execute(query)
         logs = result.scalars().all()
@@ -132,9 +133,10 @@ class AuditService:
         filters: Optional[AuditLogSearch] = None
     ) -> str:
         """Export audit logs to CSV format."""
+        # Buscar todos os logs sem limite de paginação (usar None)
         logs, _ = await self.get_logs(
             filters=filters,
-            pagination=PaginationParams(page=1, page_size=10000)
+            pagination=None  # Sem limite para exportação
         )
         
         output = StringIO()
@@ -174,9 +176,10 @@ class AuditService:
         filters: Optional[AuditLogSearch] = None
     ) -> str:
         """Export audit logs to JSON format."""
+        # Buscar todos os logs sem limite de paginação (usar None)
         logs, _ = await self.get_logs(
             filters=filters,
-            pagination=PaginationParams(page=1, page_size=10000)
+            pagination=None  # Sem limite para exportação
         )
         
         data = []

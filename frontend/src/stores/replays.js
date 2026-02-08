@@ -130,6 +130,39 @@ export const useReplaysStore = defineStore('replays', () => {
         }
     }
 
+    async function uploadReplay(formData, onProgress) {
+        isLoading.value = true
+        error.value = null
+
+        try {
+            const response = await api.post('/api/replays/upload', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                },
+                onUploadProgress: (progressEvent) => {
+                    if (onProgress && progressEvent.total) {
+                        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+                        onProgress(percentCompleted)
+                    }
+                }
+            })
+
+            const uploadedReplay = response.data
+
+            // Add to replays list
+            replays.value.unshift(uploadedReplay)
+            total.value++
+
+            return uploadedReplay
+        } catch (err) {
+            error.value = err.response?.data?.detail || 'Falha ao fazer upload'
+            console.error('Failed to upload replay:', err)
+            throw err
+        } finally {
+            isLoading.value = false
+        }
+    }
+
     return {
         // State
         replays,
@@ -148,6 +181,7 @@ export const useReplaysStore = defineStore('replays', () => {
         fetchReplays,
         fetchReplay,
         deleteReplay,
+        uploadReplay,
         setFilters,
         resetFilters,
         nextPage,
