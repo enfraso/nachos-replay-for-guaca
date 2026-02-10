@@ -1,6 +1,6 @@
 # Nachos Replay for Guaca
 
-Sistema de Replay e Auditoria de Sessões Apache Guacamole para centralização, armazenamento e reprodução de gravações de sessões remotas.
+Sistema de gerenciamento de arquivos de Replay e Auditoria de Sessões Apache Guacamole para centralização, armazenamento e reprodução de gravações de sessões remotas.
 
 ![Vue.js](https://img.shields.io/badge/Vue.js-3.4-4FC08D?logo=vue.js)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688?logo=fastapi)
@@ -410,4 +410,5 @@ MIT License - Veja [LICENSE](LICENSE) para detalhes.
 3. Commit suas alterações (`git commit -m 'Add nova feature'`)
 4. Push para a branch (`git push origin feature/nova-feature`)
 5. Abra um Pull Request
+
 
